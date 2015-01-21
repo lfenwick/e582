@@ -3,7 +3,8 @@
    http://oceancolor.gsfc.nasa.gov/cms/L3Bins.html
 
    usage:
-            test18=tile_calc(18)
+            import tile_calc
+            test18=tile_calc.tile_calc(18)
             print(test18.latlon2tile(49.2333,-123.25))
             should output  tile=343
 
@@ -108,11 +109,10 @@ class tile_calc(object):
 
 if __name__ == "__main__":
     
-    test18=tile_calc(18)
-    print(test18.tile2bounds(367))
-    print(test18.tile2bounds(411))
-    print(test18.tile2bounds(412))
-    print(test18.tile2latlon(367))
-    print(test18.latlon2tile(49.2333,-123.25))
-    
+    import tile_calc
+    print('lat lon bounds for tile 367: ',test18.tile2bounds(367))
+    print('bounds for 411: ',test18.tile2bounds(411))
+    print('bounds for 412: ',test18.tile2bounds(412))
+    print('central lat lon for 367: ',test18.tile2latlon(367))
+    print('tile for UBC: ',test18.latlon2tile(49.2333,-123.25))
           
