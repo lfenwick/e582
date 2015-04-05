@@ -111,6 +111,14 @@ extern "C" {
       highout[i] = myseq[6];
     }
   }
+
+  void readbit(char* dataPtr,char* bitPtr,int bitnum, int nvals){
+    for(int i=0; i < nvals; ++i){
+      std::bitset<8> myseq(dataPtr[i]);
+      bitPtr[i] = myseq[bitnum];
+    }
+  }
+
 }
 
 

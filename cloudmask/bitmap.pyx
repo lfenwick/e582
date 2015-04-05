@@ -13,6 +13,8 @@ cdef extern  void readthin_cirrus_cpp(int8_t* byteone,int8_t* highout,int nvals)
 
 cdef extern  void readhigh_cloud_cpp(int8_t* byteone,int8_t* thinout,int nvals)
 
+cdef extern  void readbit(int8_t* inbyte,int8_t* outbyte,int bitnum, int nvals)
+
 def getmask_zero(object byteone):
     """
        http://modis-atmos.gsfc.nasa.gov/MOD35_L2/format.html
@@ -82,6 +84,28 @@ def getmask_one(object byteone):
     out=(thinout,highout)
     return out
 
+def getbit(object inbyte,int bitnum):
+    """
+       inbyte is 2 dimensional numpy array of type np.int8
+       containing  one of the six bytes from /mod35/Data Fields/Cloud_Mask
+
+       bitnum is the bit number (0-7) to read out of that byte
+
+       returns:
+
+           an int8 numarray of 0,1 values with the same shape
+           as inbyte
+
+    """
+    pybute=np.ascontiguousarray(inbyte)
+    cdef int nvals= inbyte.size
+    cdef np.int8_t [:,:] inbyte_view=inbyte
+    cdef np.int8_t* dataPtr=<np.int8_t*> &inbyte_view[0,0]
+    bitout=np.empty_like(inbyte)
+    cdef np.int8_t [:,:] bitout_view=bitout
+    cdef np.int8_t* bitPtr= <np.int8_t*> &bitout_view[0,0]
+    readbit(dataPtr, bitPtr,bitnum,nvals)
+    return bitout
 
 
 
