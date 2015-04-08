@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 """
-  read the level1b file and the cloud mask file from dump_cloudmask.py and
-  produce plots of the chan31 radiance, channel 1 reflectance,
-  cloud mask and landmask
+  read the level1b file, geom file, cloud model file and the cloud mask file from dump_cloudmask.py and
+  produce plots of the the particle phase
 
   usage:
 
-  ./plot_cloudmask.py MYD021KM.A2014127.2110*.h5 MYD03.A2014127.2110.h5 mask_day127_2110.h5 
+  ./plot_palettes.py names.json
 
 """
 from __future__ import division
@@ -36,8 +35,14 @@ from collections import OrderedDict as od
 import compat
 from compat import text_
 import numpy.ma as ma
-from matplotlib.colors import LinearSegmentedColormap as linear_map
-from matplotlib.colors import ListedColormap as list_map
+#
+# two different ways of generating a colormap
+# use this for continuous variables
+from matplotlib.colors import LinearSegmentedColormap
+#
+# and use this for discrete colors
+#
+from matplotlib.colors import ListedColormap
 import pdb
 
 
@@ -120,10 +125,6 @@ def get_channels(l1b_file,geom_file,cloud_mask,mod06_file):
 
     
 if __name__ == "__main__":
-    #
-    # the following two lines help format the docstring at the top of the file
-    # into a help text
-    #
 
     linebreaks=argparse.RawTextHelpFormatter
     descrip=textwrap.dedent(globals()['__doc__'])
@@ -153,12 +154,11 @@ if __name__ == "__main__":
     lcc_values['resolution']='c'
     lcc_values['projection']='lcc'
 
-    #
-    #pixels with map projection
-    #
 
     plt.close('all')
-
+    #
+    # grid the data
+    #
     missing_val=-999.  
     latlim=[lcc_values['llcrnrlat'],lcc_values['urcrnrlat']]
     lonlim=[lcc_values['llcrnrlon'],lcc_values['urcrnrlon']]
@@ -168,32 +168,32 @@ if __name__ == "__main__":
     land_grid, longrid, latgrid, bin_count = reproj_numba(landout,missing_val, the_lon, the_lat, lonlim, latlim, res)
     c31bright_grid, longrid, latgrid, bin_count = reproj_numba(c31_bright,missing_val, the_lon, the_lat, lonlim, latlim, res)
     c29bright_grid, longrid, latgrid, bin_count = reproj_numba(c29_bright,missing_val, the_lon, the_lat, lonlim, latlim, res)
+    #
+    # need to change all 6's to 4's so the color map goes uniformly from 0-4
+    #
     hit=phase==6
     phase[hit]=4
     phase_grid,longrid, latgrid, bin_count = reproj_numba(phase,missing_val, the_lon, the_lat, lonlim, latlim, res)
-
-    
+    #
+    # plot the ungridded cloud model phase variable (MYD06_L2) in 5 discrete colors
+    # using ListedColorMap 
+    #
     fig,ax=plt.subplots(1,1,figsize=(12,12))
     #
-    # tell Basemap what axis to plot into
+    # make a 5 color palette
     #
-    ## vmin= 0.
-    ## vmax= 6.
-    ## the_norm=Normalize(vmin=vmin,vmax=vmax,clip=False)
-    pal=linear_map.from_list('test',sns.color_palette('hls',5),N=5)
     colors = ["royal blue", "baby blue", "eggshell", "burnt red", "soft pink"]
     print([the_color for the_color in colors])
     colors=[sns.xkcd_rgb[the_color] for the_color in colors]
-    print(colors)
-    pal=list_map(colors,N=5)
-    ## colors=cm.ocean(np.arange(cm.ocean.N))
-    ## pal=map.from_list('test',colors,N=5)
-    phase_rot=np.rot90(phase)
-    phase_rot=np.rot90(phase_rot)
+    pal=ListedColormap(colors,N=5)
+    #
+    # the A2014127.2110 scene is a descending orbit, so south is on top
+    # and west is on the right, need to rotate through 180 degrees
+    #
+    phase_rot=np.rot90(phase,2)
     CS=ax.imshow(phase_rot,cmap=pal)
-    ax.set_title('2 rotations')
+    ax.set_title('ungridded phase map with 2 rotations')
     cax=fig.colorbar(CS)
-    #label=cax.set_label(')
     labels='0 -- cloud free,1 -- water cloud,2 -- ice cloud,3 -- mixed phase cloud,4 -- undetermined phase'
     labels=labels.split(',')
     ends=np.linspace(0,4,6)
@@ -201,12 +201,17 @@ if __name__ == "__main__":
     cax.set_ticks(centers)
     cax.set_ticklabels(labels)
     fig.canvas.draw()
-    #CBar=plt.colorbar(CS, 'right', size='5%', pad='5%',extend=None)
-
+    fig.savefig('{}/ungridded_phase_map.png'.format(plot_dir))
+    #
+    # histogram the raw phase values
+    #
     fig,ax=plt.subplots(1,1,figsize=(12,12))
     ax.hist(phase.ravel())
-
-    
+    ax.set_title('Raw: Gridded: Mask - 0 = Cloud,1 = 66% prob.\n Clear,2 = 95% prob. Clear,3 = 99% prob. Clear')
+    fig.savefig('{}/ungridded_phase_hist.png'.format(plot_dir))
+    #
+    #  here is the gridded phase, lcc projection
+    #
     fig,ax=plt.subplots(1,1,figsize=(12,12))
     lcc_values['ax']=ax
     proj=make_plot(lcc_values)
@@ -219,6 +224,9 @@ if __name__ == "__main__":
     cax=proj.colorbar(CS, 'right', size='5%', pad='5%',extend='both')
     labels='0 -- cloud free,1 -- water cloud,2 -- ice cloud,3 -- mixed phase cloud,4 -- undetermined phase'
     labels=labels.split(',')
+    #
+    # label the colorbar axis with centered values
+    #
     ends=np.linspace(0,4,6)
     centers=(ends[1:] + ends[:-1])/2.
     cax.set_ticks(centers)
@@ -226,15 +234,21 @@ if __name__ == "__main__":
     cax.set_label('phase')
     proj.ax.set_title('phase')
     proj.ax.figure.canvas.draw()
-    fig.savefig('{}/phase.png'.format(plot_dir))
-
+    fig.savefig('{}/gridded_phase_map.png'.format(plot_dir))
+    #
+    # 
+    #
     fig,ax=plt.subplots(1,1,figsize=(12,12))
     ax.hist(phase_grid.compressed())
-    
-    
+    ax.set_title('Gridded: Mask - 0 = Cloud,1 = 66% prob.\n Clear,2 = 95% prob. Clear,3 = 99% prob. Clear')
+    fig.savefig('{}/gridded_phase_hist.png'.format(plot_dir))
+    #
+    # compare this to the 8 - 11 micron brightness temperaure difference
+    # this is a continuous variable so use 256 colors, 
+    #
     fig,ax=plt.subplots(1,1,figsize=(12,12))
-    colors=sns.color_palette('coolwarm_r')
-    pal=linear_map.from_list('test',colors)
+    colors=sns.color_palette('coolwarm')
+    pal=LinearSegmentedColormap.from_list('test',colors)
     pal.set_bad('0.75') #75% grey
     pal.set_over('r')
     pal.set_under('k')
@@ -247,20 +261,17 @@ if __name__ == "__main__":
     tdiff_grid=ma.array(tdiff_grid,mask=np.isnan(tdiff_grid))
     CS=proj.ax.pcolormesh(x,y,tdiff_grid,cmap=pal,norm=the_norm)
     cax=proj.colorbar(CS, 'right', size='5%', pad='5%',extend='both')
-    ax.set_title('t8 - t11')
-    
-    
-    fig,ax=plt.subplots(1,1,figsize=(12,12))
-    mask_grid=ma.array(mask_grid,mask=np.isnan(mask_grid))
-    ax.hist(mask_grid.compressed())
-    ax.set_title('Mask - 0 = Cloud,1 = 66% prob.\n Clear,2 = 95% prob. Clear,3 = 99% prob. Clear')
-            
+    ax.set_title('TB 8 miron - TB 11 micron')
+    fig.savefig('{}/gridded_TBdiff_map.png'.format(plot_dir))
+    #
+    # now plot the cloud mask from MYD35_L2 for compairson
+    #
     fig,ax=plt.subplots(1,1,figsize=(12,12))
     colors = ["eggshell","baby blue","sky blue","royal blue"]
     colors=[sns.xkcd_rgb[the_color] for the_color in colors]
     colors=sns.color_palette("Blues")
     colors=sns.color_palette('coolwarm_r')
-    pal=list_map(colors,N=4)
+    pal=ListedColormap(colors,N=4)
     pal.set_bad('0.75') #75% grey
     labels='0:Cloud,1:66% Clear,2:95% Clear,3: 99% Clear'
     labels=labels.split(',')
@@ -268,14 +279,18 @@ if __name__ == "__main__":
     centers=(ends[1:] + ends[:-1])/2.
     lcc_values['ax']=ax
     proj=make_plot(lcc_values)
+    mask_grid=ma.array(mask_grid,mask=np.isnan(mask_grid))
     CS=proj.ax.pcolormesh(x,y,mask_grid,cmap=pal)
     cax=proj.colorbar(CS, 'right', size='5%', pad='5%')
     cax.set_ticks(centers)
     cax.set_ticklabels(labels)
     proj.ax.set_title('Mask - 0 = Cloud,1 = 66% prob. Clear,2 = 95% prob. Clear,3 = 99% prob. Clear')
     proj.ax.figure.canvas.draw()
-    fig.savefig('{}/cloudmask.png'.format(plot_dir))
-
+    fig.savefig('{}/mapped_cloudmask.png'.format(plot_dir))
+    #
+    # finally, for OSX and linux, read the high cloud bit that uses the 6.7 micron
+    # brightness temperature
+    #
     try:
         import bitmap
         rawmask_h5=h5py.File(name_dict['rawmask_file'])
@@ -286,18 +301,21 @@ if __name__ == "__main__":
         
         fig,ax=plt.subplots(1,1,figsize=(12,12))
         ax.hist(high_cloud_flag.ravel())
-        ax.set_title('raw bit')
+        ax.set_title('histogrammed 6.7 micron raw bit')
         
         high_grid, longrid, latgrid, bin_count = reproj_numba(high_cloud_flag,missing_val, the_lon, the_lat, lonlim, latlim, res)
         high_grid=ma.array(high_grid,mask=np.isnan(high_grid))
         
         fig,ax=plt.subplots(1,1,figsize=(12,12))
         ax.hist(high_grid.compressed())
-        ax.set_title('gridded bit')
-        
+        ax.set_title('histogram gridded 6.7 micron  bit')
+        fig.savefig('{}/hist_gridded_bit.png'.format(plot_dir))
+        #
+        # now map this using a two color palette
+        #
         colors = ["eggshell","sky blue"]
         colors=[sns.xkcd_rgb[the_color] for the_color in colors]
-        pal=list_map(colors,N=2)
+        pal=ListedColormap(colors,N=2)
         pal.set_bad('0.75') #75% grey
         pal.set_over('r')
         pal.set_under('k')
@@ -316,6 +334,7 @@ if __name__ == "__main__":
         cax.set_ticks(centers)
         cax.set_ticklabels(labels)
         ax.set_title('6.7 micron high cloud flag')
+        fig.savefig('{}/map_gridded_bit.png'.format(plot_dir))
     except ImportError:
         print("couldn't import bitmap, skipping high cloud mask plot")
    
