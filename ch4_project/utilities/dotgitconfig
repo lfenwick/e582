@@ -1,0 +1,4 @@
+[filter "nbstrip"]        
+      clean = nbstripout.py
+      smudge =cat
+      required
